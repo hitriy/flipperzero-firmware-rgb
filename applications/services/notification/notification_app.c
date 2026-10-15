@@ -9,6 +9,7 @@
 #include "notification.h"
 #include "notification_messages.h"
 #include "notification_app.h"
+#include <applications/settings/notification_settings/rgb_backlight.h>
 
 #define TAG "NotificationSrv"
 
@@ -568,6 +569,7 @@ static void notification_storage_callback(const void* message, void* context) {
 }
 
 static void notification_apply_settings(NotificationApp* app) {
+    rgb_backlight_load_settings();
     if(!notification_load_settings(app)) {
         notification_save_settings(app);
     }
@@ -616,9 +618,11 @@ int32_t notification_srv(void* p) {
             break;
         case SaveSettingsMessage:
             notification_save_settings(app);
+            rgb_backlight_save_settings();
             break;
         case LoadSettingsMessage:
             notification_load_settings(app);
+            rgb_backlight_load_settings();
             break;
         }
 
