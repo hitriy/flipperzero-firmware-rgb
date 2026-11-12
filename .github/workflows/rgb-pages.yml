@@ -30,9 +30,9 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
-          TAG=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)
-          CURRENT=$(curl --fail --silent https://hitriy.github.io/flipperzero-firmware-rgb/channels.json | jq -r .rgb_tag || true)
-          if [[ "$EVENT_NAME" != 'workflow_run' || "$TAG" != "$CURRENT" ]]; then
+          TAGS=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --paginate --slurp | jq -c '[.[][] | select(.draft == false and .prerelease == false) | .tag_name | select(test("^rgb-v?[0-9]+\\.[0-9]+\\.[0-9]+-r[0-9]+$"))] | sort')
+          CURRENT=$(curl --fail --silent https://hitriy.github.io/flipperzero-firmware-rgb/channels.json | jq -c '[.releases[]?.tag] | sort' || true)
+          if [[ "$EVENT_NAME" != 'workflow_run' || "$TAGS" != "$CURRENT" ]]; then
             echo 'deploy=true' >> "$GITHUB_OUTPUT"
           fi
 
@@ -57,14 +57,17 @@ jobs:
       - uses: actions/setup-node@v7.1.0
         with:
           node-version: '24'
-      - name: Download the fork's latest published RGB release
+      - name: Download the fork's published RGB releases
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh api "repos/$GITHUB_REPOSITORY/releases/latest" > release.json
-          TAG=$(jq -r .tag_name release.json)
-          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern '*update-*.tgz' --pattern SHA256SUMS --dir downloads
+          python3 -m unittest discover -s automation/rgb/web -v
+          node --test automation/rgb/web/test_download.mjs
+          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --paginate --slurp | jq '[.[][] | select(.draft == false and .prerelease == false) | select(.tag_name | test("^rgb-v?[0-9]+\\.[0-9]+\\.[0-9]+-r[0-9]+$"))]' > release.json
+          while IFS= read -r TAG; do
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern '*update-*.tgz' --pattern SHA256SUMS --dir "downloads/$TAG"
+          done < <(jq -r '.[].tag_name' release.json)
           python3 automation/rgb/web/prepare.py --lab lab --release release.json --downloads downloads
       - name: Build Flipper Lab for static Pages hosting
         working-directory: lab/frontend
