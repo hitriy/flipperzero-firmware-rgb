@@ -1,0 +1,115 @@
+name: RGB stable firmware
+
+on:
+  schedule:
+    - cron: '2-57/5 * * * *'
+  repository_dispatch:
+    types: [upstream-release]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Official stable tag (empty checks all releases since 1.5.1)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rgb-release
+  cancel-in-progress: false
+
+jobs:
+  keep-schedule-active:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record a heartbeat after 30 days without commits
+        run: |
+          set -euo pipefail
+          if (( $(date +%s) - $(git log -1 --format=%ct) >= 2592000 )); then
+            date -u +%FT%TZ > rgb/last-release-check.txt
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add rgb/last-release-check.txt
+            git commit -m 'Keep automatic upstream release checks active'
+            git push origin "HEAD:$GITHUB_REF_NAME"
+          fi
+
+  discover:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.releases.outputs.matrix }}
+      pending: ${{ steps.releases.outputs.pending }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -m unittest discover -s rgb/automation -v
+      - id: releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_TAG: ${{ inputs.tag || github.event.client_payload.tag || '' }}
+        run: python3 rgb/automation/releases.py
+
+  build:
+    needs: discover
+    if: needs.discover.outputs.pending == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.discover.outputs.matrix) }}
+    permissions:
+      contents: write
+    env:
+      UPSTREAM_TAG: ${{ matrix.tag }}
+      GH_TOKEN: ${{ github.token }}
+      FBT_GIT_SUBMODULE_SHALLOW: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: automation
+          persist-credentials: false
+      - name: Fetch official release and apply reviewed patch
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch "$UPSTREAM_TAG" https://github.com/flipperdevices/flipperzero-firmware.git source
+          cd source
+          git rev-parse HEAD > ../upstream-sha.txt
+          git apply --check ../automation/rgb/patches/0001-rgb-backlight.patch
+          git apply ../automation/rgb/patches/0001-rgb-backlight.patch
+          # Source tags must not run the vendor's private-runner workflows.
+          git rm -r .github/workflows
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
+          export GIT_AUTHOR_DATE="@$SOURCE_DATE_EPOCH +0000"
+          export GIT_COMMITTER_DATE="$GIT_AUTHOR_DATE"
+          echo "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" >> "$GITHUB_ENV"
+          git add applications lib targets
+          git commit -m "RGB backlight for official $UPSTREAM_TAG"
+          RGB_TAG="rgb-${UPSTREAM_TAG}-r1"
+          git tag "$RGB_TAG"
+          echo "RGB_TAG=$RGB_TAG" >> "$GITHUB_ENV"
+          echo "DIST_SUFFIX=$RGB_TAG" >> "$GITHUB_ENV"
+          echo "WORKFLOW_BRANCH_OR_TAG=$RGB_TAG" >> "$GITHUB_ENV"
+      - name: Build firmware, updater and bundled apps
+        working-directory: source
+        run: ./fbt TARGET_HW=7 DEBUG=0 COMPACT=1 updater_package fap_dist
+      - name: Package release and source provenance
+        run: python3 automation/rgb/automation/package.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.RGB_TAG }}
+          path: release/*
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish only after successful build
+        run: python3 automation/rgb/automation/publish.py

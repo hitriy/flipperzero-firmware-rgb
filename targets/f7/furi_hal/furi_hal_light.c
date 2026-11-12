@@ -3,6 +3,7 @@
 #include <furi_hal_light.h>
 #include <lp5562.h>
 #include <stdint.h>
+#include <applications/settings/notification_settings/rgb_backlight.h>
 
 #define LED_CURRENT_RED   (50u)
 #define LED_CURRENT_GREEN (50u)
@@ -41,12 +42,10 @@ void furi_hal_light_set(Light light, uint8_t value) {
     if(light & LightBlue) {
         lp5562_set_channel_value(&furi_hal_i2c_handle_power, LP5562ChannelBlue, value);
     }
-    if(light & LightBacklight) {
-        uint8_t prev = lp5562_get_channel_value(&furi_hal_i2c_handle_power, LP5562ChannelWhite);
-        lp5562_execute_ramp(
-            &furi_hal_i2c_handle_power, LP5562Engine1, LP5562ChannelWhite, prev, value, 100);
-    }
     furi_hal_i2c_release(&furi_hal_i2c_handle_power);
+    if(light & LightBacklight) {
+        rgb_backlight_update(value);
+    }
 }
 
 void furi_hal_light_blink_start(Light light, uint8_t brightness, uint16_t on_time, uint16_t period) {
