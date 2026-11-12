@@ -27,7 +27,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
       - name: Record a heartbeat after 30 days without commits
         run: |
           set -euo pipefail
@@ -47,7 +47,7 @@ jobs:
       matrix: ${{ steps.releases.outputs.matrix }}
       pending: ${{ steps.releases.outputs.pending }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
       - run: python3 -m unittest discover -s rgb/automation -v
@@ -73,7 +73,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       FBT_GIT_SUBMODULE_SHALLOW: '1'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
         with:
           path: automation
           persist-credentials: false
@@ -105,7 +105,7 @@ jobs:
         run: ./fbt TARGET_HW=7 DEBUG=0 COMPACT=1 updater_package fap_dist
       - name: Package release and source provenance
         run: python3 automation/rgb/automation/package.py
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7.0.2
         with:
           name: ${{ env.RGB_TAG }}
           path: release/*
