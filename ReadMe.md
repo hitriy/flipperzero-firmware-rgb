@@ -2,7 +2,7 @@
 
 Automatically built official stable releases with [quen0n's RGB backlight patch](https://github.com/quen0n/flipperzero-firmware-rgb), ported to current firmware.
 
-[Download RGB firmware](https://github.com/hitriy/flipperzero-firmware-rgb/releases) · [Build status](https://github.com/hitriy/flipperzero-firmware-rgb/actions/workflows/rgb-release.yml) · [Setup, patch provenance and dispatch hook](rgb/README.md)
+[Web flasher](https://hitriy.github.io/flipperzero-firmware-rgb/) · [Download RGB firmware](https://github.com/hitriy/flipperzero-firmware-rgb/releases) · [RGB hardware and PCB](https://github.com/hitriy/fliipper-rgb-hardware) · [Build status](https://github.com/hitriy/flipperzero-firmware-rgb/actions/workflows/rgb-release.yml) · [Setup, patch provenance and dispatch hook](rgb/README.md)
 
 Requires the three-LED SK6805 RGB backlight hardware mod. This is an unofficial fork.
 

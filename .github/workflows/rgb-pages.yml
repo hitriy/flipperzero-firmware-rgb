@@ -1,0 +1,91 @@
+name: RGB web updater
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [rgb-release]
+    paths: ['rgb/web/**', '.github/workflows/rgb-pages.yml']
+  workflow_run:
+    workflows: ['RGB stable firmware']
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rgb-pages
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      deploy: ${{ steps.check.outputs.deploy }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          TAG=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)
+          CURRENT=$(curl --fail --silent https://hitriy.github.io/flipperzero-firmware-rgb/channels.json | jq -r .rgb_tag || true)
+          if [[ "$EVENT_NAME" != 'workflow_run' || "$TAG" != "$CURRENT" ]]; then
+            echo 'deploy=true' >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: check
+    if: needs.check.outputs.deploy == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          path: automation
+          persist-credentials: false
+          sparse-checkout: rgb/web
+      - uses: actions/checkout@v7.0.1
+        with:
+          repository: flipperdevices/lab.flipper.net
+          ref: 9902d4d8103fa5df1e478cbd5d35a3a6f4f566fc
+          submodules: recursive
+          path: lab
+          persist-credentials: false
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '24'
+      - name: Download the fork's latest published RGB release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/releases/latest" > release.json
+          TAG=$(jq -r .tag_name release.json)
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern '*update-*.tgz' --pattern SHA256SUMS --dir downloads
+          python3 automation/rgb/web/prepare.py --lab lab --release release.json --downloads downloads
+      - name: Build Flipper Lab for static Pages hosting
+        working-directory: lab/frontend
+        run: |
+          npx --yes yarn@1.22.22 install --frozen-lockfile --ignore-scripts
+          npm exec -- quasar prepare
+          npm exec -- quasar build -m spa
+      - uses: actions/upload-pages-artifact@v5.0.0
+        with:
+          path: lab/frontend/dist/spa
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5.0.1
