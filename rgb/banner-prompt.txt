@@ -1,0 +1,7 @@
+Generated with the built-in image generation tool from .github/assets/light_theme_banner.png.
+Output: .github/assets/rgb-banner.png
+Approved by the repository owner before publication.
+transparent_background: false
+
+Final prompt:
+Make a faithful minimal edit of the supplied wide Flipper GitHub README banner, preserving its composition and opaque pure WHITE background. The original image is opaque RGB, not transparent. Keep the black and white pixel-art dolphin on the left and large black FLIPPER wordmark on the right, recognizably the same as the source. Change the subtitle to exactly 'Flipper Zero + RGB', retaining crisp black pixel lettering, without any outline, shadow or glow. Retain the perspective grid in the bottom right, but change its orange floor to a clean horizontal red-green-blue colour progression, keeping the white grid lines. Keep the dolphin unchanged. No added objects, no visual noise, no transparent areas. Maintain the original extremely wide banner composition.

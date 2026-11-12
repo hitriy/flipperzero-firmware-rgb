@@ -6,13 +6,7 @@ Automatically built official stable releases with [quen0n's RGB backlight patch]
 
 Requires the three-LED SK6805 RGB backlight hardware mod. This is an unofficial fork.
 
-<picture>
-    <source media="(prefers-color-scheme: dark)" srcset="/.github/assets/dark_theme_banner.png">
-    <source media="(prefers-color-scheme: light)" srcset="/.github/assets/light_theme_banner.png">
-    <img
-        alt="A pixel art of a Dophin with text: Flipper Zero Official Repo"
-        src="/.github/assets/light_theme_banner.png">
-</picture>
+<img alt="Flipper Zero + RGB: white pixel-art dolphin and RGB perspective grid" src=".github/assets/rgb-banner.png">
 
 # Flipper Zero Firmware
 
